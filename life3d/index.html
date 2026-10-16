@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Life³ תלת־ממדי</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Secular+One&display=swap">
+<style>
+/* Layout: full-bleed specimen chamber; readout plate top, control drawer bottom. Single dark look by choice. */
+:root{
+  --void:#0b0e14; --plate:rgba(18,23,33,.86); --line:#2a3344; --ink:#e6ebf3; --mute:#8592a8; --glow:#7cf0c8;
+  --f-display:"Secular One","IBM Plex Sans Hebrew",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Hebrew",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-data:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;overflow:hidden;touch-action:none}
+body{background:var(--void);color:var(--ink);font-family:var(--f-body);-webkit-user-select:none;user-select:none}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;width:100%;height:100%}
+.top{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));left:max(16px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:flex-start;gap:12px;pointer-events:none;direction:rtl}
+.brand{font-family:var(--f-display);font-size:22px;letter-spacing:.01em;line-height:1}
+.brand small{display:block;font-family:var(--f-data);font-size:11px;color:var(--mute);margin-top:6px;letter-spacing:.06em}
+.read{display:grid;grid-template-columns:auto auto;gap:2px 10px;background:var(--plate);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-family:var(--f-data);font-size:12px;font-variant-numeric:tabular-nums;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.read span:nth-child(odd){color:var(--mute);font-family:var(--f-body)}
+.read b{font-weight:500;text-align:left;direction:ltr}
+.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top,0px));font-size:13px;color:var(--mute);background:var(--plate);border:1px solid var(--line);padding:6px 12px;border-radius:20px;white-space:nowrap;transition:opacity .6s;pointer-events:none;direction:rtl}
+.drawer{position:fixed;left:0;right:0;bottom:0;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:linear-gradient(to top,rgba(11,14,20,.97) 60%,rgba(11,14,20,0));direction:rtl}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.btns{display:flex;gap:8px}
+button{font:inherit;font-size:14px;color:var(--ink);background:#161c28;border:1px solid var(--line);border-radius:8px;padding:9px 0;flex:1;cursor:pointer}
+button:active{background:#1f2738}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--glow);outline-offset:2px}
+button.primary{background:var(--glow);color:#06221a;border-color:var(--glow);font-weight:600;flex:1.4}
+.row{display:grid;grid-template-columns:5.2em 1fr 3.6em;align-items:center;gap:10px;font-size:13px}
+.row label{color:var(--mute)}
+.row output{font-family:var(--f-data);font-size:12px;text-align:left;direction:ltr;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--glow);margin:0}
+select{font:inherit;font-size:13px;color:var(--ink);background:#161c28;border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:100%;min-width:0}
+.rule{font-family:var(--f-data);font-size:11px;color:var(--mute);direction:ltr;text-align:left}
+</style>
+</head><body>
+
+<div id="stage"></div>
+
+<div class="top">
+  <div class="brand">Life³<small>3D CELLULAR AUTOMATON</small></div>
+  <div class="read">
+    <span>דור</span><b id="gen">0</b>
+    <span>תאים חיים</span><b id="pop">0</b>
+    <span>יצורים</span><b id="spc">0</b>
+  </div>
+</div>
+<div class="hint" id="hint">נגיעה מוסיפה יצור · שתי אצבעות: סיבוב וזום</div>
+
+<div class="drawer">
+  <div class="wrap">
+    <div class="btns">
+      <button class="primary" id="play">השהה</button>
+      <button id="step">צעד</button>
+      <button id="seed">זריעה</button>
+      <button id="clear">נקה</button>
+    </div>
+    <div class="row"><label for="speed">קצב</label><input type="range" id="speed" min="1" max="30" value="8"><output id="speedOut">8/s</output></div>
+    <div class="row"><label for="size">גודל גריד</label><input type="range" id="size" min="8" max="40" step="2" value="24"><output id="sizeOut">24³</output></div>
+    <div class="row"><label for="lattice">סוג גריד</label><select id="lattice"></select><output class="rule" id="kOut">26</output></div>
+    <div class="row"><label for="rule">חוק</label>
+      <select id="rule"></select>
+      <output class="rule" id="ruleOut">S/B</output></div>
+    <div class="row"><label for="decay">דעיכה</label><input type="range" id="decay" min="2" max="20" value="10"><output id="decayOut">10</output></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+// ---------- lattices ----------
+// Each lattice: neighbour offsets on an integer grid, which grid points are cells, a world mapping and a cell solid that tiles space.
+const LATTICES={
+  cube26:{label:'קוביות · 26 שכנים',rules:[
+    ['פירוקלסטי','4-7/6-8',10],['נודדים','4-5/4',8],['אלמוג','4-6/4',12],['445','4/4',5],['אמבה','9-26/5-7,12-13,15-16',5],['קונווי מקורי','2-3/3',2],['Bays 4555','4-5/5',2]]},
+  cube18:{label:'קוביות · 18 שכנים (פאות וצלעות)',rules:[]},
+  cube6:{label:'קוביות · 6 שכנים (פאות בלבד)',rules:[]},
+  fcc:{label:'דודקהדרון מעוין · 12 שכנים',rules:[]},
+  bcc:{label:'אוקטהדרון קטום · 14 שכנים',rules:[]},
+  hex:{label:'מנסרה משושה · 8 שכנים',rules:[]},
+};
+LATTICES.cube18.rules=[['שקט','4-8/6-7',2],['שוצף','4-7/5-6',8],['צפוף','3-5/4',4]];
+LATTICES.cube6.rules=[['שריגים','3-5/2-3',2],['גלים','2-4/2-4',4],['חוטים','3-6/2',2]];
+LATTICES.fcc.rules=[['נבגים','0-4/4-6',8],['תאי דבורה','2-6/5-7',2],['נודדים','0-4/4',4]];
+LATTICES.bcc.rules=[['קצף','2-4/4',4],['גבישים','2-6/5-6',2],['ענן','1-3/4-6',4]];
+LATTICES.hex.rules=[['כוורת','1-3/3',2],['עמודים','3-6/3-5',2],['זרמים','0-3/3-5',4]];
+const HEX_A=1.0746;
+function makeLattice(type,N){
+  let r=N,offs=[],valid=()=>true,s=1;
+  const all=[];for(let z=-2;z<=2;z++)for(let y=-2;y<=2;y++)for(let x=-2;x<=2;x++)if(x||y||z)all.push([x,y,z]);
+  const ab=o=>o.map(Math.abs).sort((a,b)=>a-b);
+  if(type==='cube26')offs=all.filter(o=>ab(o)[2]===1);
+  else if(type==='cube6')offs=all.filter(o=>{const a=ab(o);return a[2]===1&&a[1]===0;});
+  else if(type==='cube18')offs=all.filter(o=>{const a=ab(o);return a[2]===1&&a[0]===0;});
+  else if(type==='fcc'){r=Math.round(N*1.26);s=Math.pow(2,-1/3);valid=(x,y,z)=>(x+y+z)%2===0;offs=all.filter(o=>{const a=ab(o);return a[0]===0&&a[1]===1&&a[2]===1;});}
+  else if(type==='bcc'){r=Math.round(N*1.587);s=Math.pow(4,-1/3);valid=(x,y,z)=>x%2===y%2&&y%2===z%2;offs=all.filter(o=>{const a=ab(o);return (a[0]===1&&a[2]===1)||(a[1]===0&&a[2]===2);});}
+  else if(type==='hex')offs=[[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[1,0,-1],[-1,0,1],[0,1,0],[0,-1,0]];
+  const id=new Int32Array(r*r*r).fill(-1),cx=[],cy=[],cz=[];
+  for(let z=0;z<r;z++)for(let y=0;y<r;y++)for(let x=0;x<r;x++)if(valid(x,y,z)){id[x+y*r+z*r*r]=cx.length;cx.push(x);cy.push(y);cz.push(z);}
+  const M=cx.length,K=offs.length,nb=new Int32Array(M*K);
+  const hx=type==='hex';
+  for(let i=0;i<M;i++)for(let k=0;k<K;k++){const X=cx[i]+offs[k][0]+(hx?Math.floor((cz[i]+offs[k][2])/2)-Math.floor(cz[i]/2):0),Y=cy[i]+offs[k][1],Z=cz[i]+offs[k][2];
+    nb[i*K+k]=(X<0||Y<0||Z<0||X>=r||Y>=r||Z>=r)?-1:id[X+Y*r+Z*r*r];}
+  const pos=new Float32Array(M*3);const lo=[1e9,1e9,1e9],hi=[-1e9,-1e9,-1e9];
+  for(let i=0;i<M;i++){
+    const p=hx?[(cx[i]-Math.floor(cz[i]/2)+cz[i]/2)*HEX_A,cy[i],cz[i]*HEX_A*Math.sqrt(3)/2]:[cx[i]*s,cy[i]*s,cz[i]*s];
+    for(let d=0;d<3;d++){pos[i*3+d]=p[d];lo[d]=Math.min(lo[d],p[d]);hi[d]=Math.max(hi[d],p[d]);}
+  }
+  const c=[0,1,2].map(d=>(lo[d]+hi[d])/2);
+  for(let i=0;i<M;i++)for(let d=0;d<3;d++)pos[i*3+d]-=c[d];
+  const half=[0,1,2].map(d=>(hi[d]-lo[d])/2+0.6);
+  return {type,M,K,nb,pos,half,s};
+}
+// convex solid from vertex set + face normals (faces = vertices on each supporting plane)
+function solid(verts,normals,scale){
+  const P=[];
+  for(const n0 of normals){
+    const n=new THREE.Vector3(...n0).normalize();
+    let m=-1e9;verts.forEach(v=>m=Math.max(m,n.dot(v)));
+    const f=verts.filter(v=>Math.abs(n.dot(v)-m)<1e-6);
+    const c=f.reduce((a,v)=>a.add(v),new THREE.Vector3()).divideScalar(f.length);
+    const u=f[0].clone().sub(c).normalize(),w=new THREE.Vector3().crossVectors(n,u);
+    f.sort((a,b)=>Math.atan2(a.clone().sub(c).dot(w),a.clone().sub(c).dot(u))-Math.atan2(b.clone().sub(c).dot(w),b.clone().sub(c).dot(u)));
+    for(let k=1;k<f.length-1;k++)[f[0],f[k],f[k+1]].forEach(v=>P.push(v.x*scale,v.y*scale,v.z*scale));
+  }
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.computeVertexNormals();return g;
+}
+function perms(base){const out=new Map();const idx=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+  for(const p of idx)for(let sg=0;sg<8;sg++){const v=p.map((q,d)=>base[q]*((sg>>d)&1?-1:1));out.set(v.join(),v);}return [...out.values()];}
+function cellGeometry(L){
+  const g=0.86;
+  if(L.type==='fcc'){const V=[...perms([1,0,0]),...perms([.5,.5,.5])].map(v=>new THREE.Vector3(...v));return solid(V,perms([1,1,0]),L.s*g);}
+  if(L.type==='bcc'){const V=perms([0,.5,1]).map(v=>new THREE.Vector3(...v));return solid(V,[...perms([1,1,1]),...perms([1,0,0])],L.s*g);}
+  if(L.type==='hex'){return new THREE.CylinderGeometry(HEX_A/Math.sqrt(3)*g,HEX_A/Math.sqrt(3)*g,g,6);}
+  return new THREE.BoxGeometry(g,g,g);
+}
+
+// ---------- simulation ----------
+let N=24,latType='cube26',L,alive,next,age,spec,nextSpec,nextAge;
+let S=new Uint8Array(27),B=new Uint8Array(27);
+let C=10,gen=0,speciesCount=0,running=true;
+
+function parseRange(s){const out=[];s.split(',').forEach(p=>{const[a,b]=p.split('-').map(Number);for(let i=a;i<=(b??a);i++)out.push(i);});return out;}
+function setRule(v){const[s,b]=v.split('/');S.fill(0);B.fill(0);parseRange(s).forEach(i=>S[i]=1);parseRange(b).forEach(i=>B[i]=1);$('ruleOut').textContent='S'+s+' B'+b;}
+function setDecay(v){C=v;$('decay').value=v;$('decayOut').textContent=v<=2?'ללא':v;}
+
+function alloc(){L=makeLattice(latType,N);const M=L.M;alive=new Uint8Array(M);next=new Uint8Array(M);age=new Uint16Array(M);nextAge=new Uint16Array(M);spec=new Uint16Array(M);nextSpec=new Uint16Array(M);gen=0;$('kOut').textContent=L.K;}
+
+function addCreatureAt(x,y,z){
+  const id=++speciesCount,r2=(N<14?1.7:2.5)**2,P=L.pos;
+  for(let i=0;i<L.M;i++){const dx=P[i*3]-x,dy=P[i*3+1]-y,dz=P[i*3+2]-z;
+    if(dx*dx+dy*dy+dz*dz<=r2&&Math.random()<.5){alive[i]=1;age[i]=0;spec[i]=id;}}
+  dirty=true;
+}
+function seed(k){const h=L.half;for(let j=0;j<k;j++)addCreatureAt(...h.map(v=>(Math.random()*2-1)*(v-3)));}
+
+const tallyId=new Uint16Array(26),tallyN=new Uint8Array(26);
+function step(){
+  const{M,K,nb}=L;
+  for(let i=0;i<M;i++){
+    const st=alive[i],b=i*K;let c=0;
+    for(let k=0;k<K;k++){const j=nb[b+k];if(j>=0&&alive[j]===1)c++;}
+    if(st===1){
+      next[i]=S[c]?1:(C>2?2:0);nextAge[i]=age[i]+1;nextSpec[i]=spec[i];
+    }else if(st>1){
+      // dying: counts as empty for neighbours, but nothing can be born here yet
+      next[i]=st+1>=C?0:st+1;nextAge[i]=age[i];nextSpec[i]=spec[i];
+    }else if(B[c]){
+      // newborn inherits the majority species of its parents
+      let n=0;
+      for(let k=0;k<K;k++){const j=nb[b+k];if(j<0||alive[j]!==1)continue;const s=spec[j];let t=0;
+        for(;t<n;t++)if(tallyId[t]===s){tallyN[t]++;break;}
+        if(t===n){tallyId[n]=s;tallyN[n]=1;n++;}}
+      let best=0;for(let t=1;t<n;t++)if(tallyN[t]>tallyN[best])best=t;
+      next[i]=1;nextAge[i]=0;nextSpec[i]=n?tallyId[best]:++speciesCount;
+    }else next[i]=0;
+  }
+  [alive,next]=[next,alive];[age,nextAge]=[nextAge,age];[spec,nextSpec]=[nextSpec,spec];
+  gen++;dirty=true;
+}
+
+// ---------- rendering ----------
+const stage=$('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+stage.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0b0e14);
+scene.fog=new THREE.Fog(0x0b0e14,30,120);
+const camera=new THREE.PerspectiveCamera(45,1,0.1,500);
+scene.add(new THREE.HemisphereLight(0xdfe8ff,0x1a1420,0.75));
+const sun=new THREE.DirectionalLight(0xffffff,0.75);sun.position.set(1,1.6,0.8);scene.add(sun);
+const mat=new THREE.MeshLambertMaterial({color:0xffffff});
+let mesh=null,box=null,geo=null,bounds=new THREE.Box3();
+const m4=new THREE.Matrix4(),col=new THREE.Color();
+let dirty=true;
+
+function buildScene(){
+  if(mesh){scene.remove(mesh);mesh.dispose?.();}
+  if(geo)geo.dispose();
+  if(box){scene.remove(box);box.geometry.dispose();}
+  geo=cellGeometry(L);
+  mesh=new THREE.InstancedMesh(geo,mat,L.M);
+  mesh.setColorAt(0,col.set(0xffffff));
+  mesh.count=0;scene.add(mesh);
+  const h=L.half;
+  box=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(h[0]*2,h[1]*2,h[2]*2)),new THREE.LineBasicMaterial({color:0x34405a}));
+  scene.add(box);
+  bounds.set(new THREE.Vector3(-h[0],-h[1],-h[2]),new THREE.Vector3(h[0],h[1],h[2]));
+  const R=Math.max(...h)*2;
+  cam.dist=R*2.6;scene.fog.near=R*1.6;scene.fog.far=R*4.6;
+  dirty=true;
+}
+
+function updateMesh(){
+  let k=0,pop=0;const P=L.pos,seen=new Set();
+  for(let i=0;i<L.M;i++){
+    const st=alive[i];if(!st)continue;
+    const s=spec[i],hue=((s*137.508)%360)/360;
+    if(st===1){
+      m4.identity().setPosition(P[i*3],P[i*3+1],P[i*3+2]);seen.add(s);pop++;
+      const a=Math.min(age[i],40)/40;
+      col.setHSL(hue,0.78-a*0.22,0.66-a*0.26);
+    }else{
+      // decaying cells shrink and darken toward the void
+      const d=(st-1)/(C-1),sc=0.7-d*0.5;
+      m4.makeScale(sc,sc,sc).setPosition(P[i*3],P[i*3+1],P[i*3+2]);
+      col.setHSL(hue,0.45,0.32-d*0.2);
+    }
+    mesh.setMatrixAt(k,m4);mesh.setColorAt(k,col);k++;
+  }
+  mesh.count=k;mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+  $('gen').textContent=gen;$('pop').textContent=pop.toLocaleString('en');$('spc').textContent=seen.size;
+}
+
+// ---------- camera & gestures ----------
+const cam={theta:0.75,phi:1.05,dist:60};
+let lastTouch=0;
+function placeCamera(){
+  const p=Math.max(0.15,Math.min(Math.PI-0.15,cam.phi));cam.phi=p;
+  const R=Math.max(...L.half)*2;
+  cam.dist=Math.max(R*0.9,Math.min(R*6,cam.dist));
+  camera.position.set(cam.dist*Math.sin(p)*Math.sin(cam.theta),cam.dist*Math.cos(p),cam.dist*Math.sin(p)*Math.cos(cam.theta));
+  camera.lookAt(0,0,0);
+}
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);
+
+const ptrs=new Map();let gesture=null;
+const el=renderer.domElement;
+el.addEventListener('contextmenu',e=>e.preventDefault());
+el.addEventListener('pointerdown',e=>{
+  el.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY});
+  lastTouch=performance.now();
+  if(ptrs.size===1)gesture={type:'maybeTap',t:performance.now(),mouse:e.pointerType==='mouse'};
+  else if(ptrs.size===2){gesture={type:'two',...twoState()};}
+});
+el.addEventListener('pointermove',e=>{
+  const p=ptrs.get(e.pointerId);if(!p)return;
+  const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;lastTouch=performance.now();
+  if(!gesture)return;
+  if(gesture.type==='maybeTap'&&Math.hypot(p.x-p.sx,p.y-p.sy)>8){gesture.type=gesture.mouse?'orbit':'none';}
+  if(gesture.type==='orbit'){cam.theta-=dx*0.008;cam.phi-=dy*0.008;}
+  if(gesture.type==='two'&&ptrs.size===2){
+    const s=twoState();
+    cam.theta-=(s.cx-gesture.cx)*0.008;cam.phi-=(s.cy-gesture.cy)*0.008;
+    if(gesture.d>0&&s.d>0)cam.dist*=gesture.d/s.d;
+    gesture={type:'two',...s};
+  }
+});
+function endPtr(e){
+  if(!ptrs.has(e.pointerId))return;
+  if(gesture&&gesture.type==='maybeTap'&&ptrs.size===1&&performance.now()-gesture.t<500)tapAt(e.clientX,e.clientY);
+  ptrs.delete(e.pointerId);
+  if(ptrs.size<2&&gesture&&gesture.type==='two')gesture={type:'none'};
+  if(ptrs.size===0)gesture=null;
+}
+el.addEventListener('pointerup',endPtr);el.addEventListener('pointercancel',endPtr);
+el.addEventListener('wheel',e=>{e.preventDefault();cam.dist*=Math.exp(e.deltaY*0.0012);lastTouch=performance.now();},{passive:false});
+function twoState(){const[a,b]=[...ptrs.values()];return{cx:(a.x+b.x)/2,cy:(a.y+b.y)/2,d:Math.hypot(a.x-b.x,a.y-b.y)};}
+
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),pIn=new THREE.Vector3(),pOut=new THREE.Vector3();
+function tapAt(cx,cy){
+  ndc.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);
+  ray.setFromCamera(ndc,camera);
+  if(!ray.ray.intersectBox(bounds,pIn))return;
+  // exit point: cast back from far along the same ray
+  const far=ray.ray.origin.clone().addScaledVector(ray.ray.direction,cam.dist*4);
+  new THREE.Ray(far,ray.ray.direction.clone().negate()).intersectBox(bounds,pOut);
+  const m=pIn.add(pOut).multiplyScalar(0.5);
+  addCreatureAt(m.x,m.y,m.z);
+  hideHint();
+}
+
+// ---------- UI ----------
+let gps=8,acc=0;
+function fillRules(){
+  const sel=$('rule');sel.innerHTML='';
+  LATTICES[latType].rules.forEach(([name,rule,c],i)=>{const o=document.createElement('option');o.value=i;o.textContent=name+' — '+rule.replace('/',' / ')+(c>2?' · '+c:'');sel.appendChild(o);});
+  applyRule(0);
+}
+function applyRule(i){const[, rule,c]=LATTICES[latType].rules[i];$('rule').value=i;setRule(rule);setDecay(c);}
+for(const k in LATTICES){const o=document.createElement('option');o.value=k;o.textContent=LATTICES[k].label;$('lattice').appendChild(o);}
+function rebuild(){alloc();buildScene();seed(Math.max(3,Math.round(N/5)));}
+$('lattice').onchange=e=>{latType=e.target.value;fillRules();rebuild();};
+$('play').onclick=()=>{running=!running;$('play').textContent=running?'השהה':'הפעל';};
+$('step').onclick=()=>{step();};
+$('seed').onclick=()=>{seed(Math.max(3,Math.round(N/5)));};
+$('clear').onclick=()=>{alive.fill(0);gen=0;dirty=true;};
+$('speed').oninput=e=>{gps=+e.target.value;$('speedOut').textContent=gps+'/s';};
+$('size').oninput=e=>{$('sizeOut').textContent=e.target.value+'³';};
+$('size').onchange=e=>{N=+e.target.value;rebuild();};
+$('rule').onchange=e=>applyRule(+e.target.value);
+$('decay').oninput=e=>{const v=+e.target.value;for(let i=0;i<alive.length;i++)if(alive[i]>=v)alive[i]=0;setDecay(v);dirty=true;};
+let hintGone=false;function hideHint(){if(hintGone)return;hintGone=true;$('hint').style.opacity=0;}
+setTimeout(hideHint,7000);
+
+// ---------- loop ----------
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(0.25,(now-last)/1000);last=now;
+  if(running){acc+=dt*gps;let n=0;while(acc>=1&&n<3){step();acc-=1;n++;}if(acc>3)acc=0;}
+  if(now-lastTouch>5000&&!matchMedia('(prefers-reduced-motion: reduce)').matches)cam.theta+=dt*0.12;
+  if(dirty){updateMesh();dirty=false;}
+  placeCamera();renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+fillRules();alloc();buildScene();seed(5);resize();requestAnimationFrame(frame);
+})();
+</script>
+</body></html>
